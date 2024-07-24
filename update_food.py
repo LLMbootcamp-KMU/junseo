@@ -18,7 +18,7 @@ db_config = {
     'database': os.getenv('DB_NAME')
 }
 
-@app.route('/api/add_food', methods=['POST'])
+@app.route('/api/food/add', methods=['POST'])
 def add_food():
     data = request.json
     
@@ -66,6 +66,58 @@ def add_food():
             }
 
             return jsonify({"message": "음식이 성공적으로 추가되었습니다.", "data": added_food_info}), 201
+
+    except pymysql.MySQLError as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        connection.close()
+
+@app.route('/api/update_food', methods=['POST'])
+def update_food():
+    data = request.json
+
+    user_id = data.get('ID')
+    date = data.get('DATE')
+    food_index = data.get('FOOD_INDEX')
+    new_food_name = data.get('NEW_FOOD_NAME')
+    
+    if not user_id or not date or not food_index or not new_food_name:
+        return jsonify({"error": "필수 정보가 누락되었습니다."}), 400
+
+    # LLM을 통해 새로운 음식 영양 정보를 가져옴
+    new_nutrition_info = llm_do(new_food_name)
+
+    try:
+        connection = pymysql.connect(**db_config)
+        with connection.cursor() as cursor:
+            update_query = """
+            UPDATE FOOD
+            SET FOOD_NAME = %s, FOOD_CH = %s, FOOD_PT = %s, FOOD_FAT = %s, FOOD_KCAL = %s
+            WHERE ID = %s AND DATE = %s AND FOOD_INDEX = %s
+            """
+            cursor.execute(update_query, (
+                new_nutrition_info['food_name'],
+                new_nutrition_info['carbohydrate'],
+                new_nutrition_info['protein'],
+                new_nutrition_info['fat'],
+                new_nutrition_info['calorie'],
+                user_id, date, food_index
+            ))
+            connection.commit()
+
+            updated_food_info = {
+                "ID": user_id,
+                "DATE": date,
+                "FOOD_INDEX": food_index,
+                "FOOD_NAME": new_nutrition_info['food_name'],
+                "FOOD_CH": new_nutrition_info['carbohydrate'],
+                "FOOD_PT": new_nutrition_info['protein'],
+                "FOOD_FAT": new_nutrition_info['fat'],
+                "FOOD_KCAL": new_nutrition_info['calorie']
+            }
+
+            return jsonify({"message": "음식이 성공적으로 수정되었습니다.", "data": updated_food_info}), 200
 
     except pymysql.MySQLError as e:
         return jsonify({"error": str(e)}), 500

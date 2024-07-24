@@ -17,7 +17,7 @@ def test_delete_food(user_id, date, food_index):
 
 if __name__ == '__main__':
     test_user_id = "상엽"
-    test_date = "2024-08-05"
-    test_food_index = 2  # 삭제할 음식의 인덱스
+    test_date = "2024-07-01"
+    test_food_index = 3  # 삭제할 음식의 인덱스
 
     test_delete_food(test_user_id, test_date, test_food_index)
