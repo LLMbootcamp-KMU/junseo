@@ -2,11 +2,11 @@ import requests
 import json
 
 def test_get_advice():
-    url = "http://localhost:5002/api/food/advice"
+    url = "http://localhost:5001/api/food/advice"
     params = {
-        "year": 2024,
-        "month": 7,
-        "user_id": "qwe"  # 테스트할 사용자 ID
+        "year": 2023,
+        "month": 10,
+        "user_id": "상엽"  # 테스트할 사용자 ID
     }
 
     response = requests.get(url, params=params)

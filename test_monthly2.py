@@ -4,8 +4,8 @@ import json
 def test_get_quarterly_food():
     url = "http://localhost:5001/api/food/quarterly"
     params = {
-        "year": 2024,
-        "month": 2,
+        "year": 2023,
+        "month": 10,
         "user_id": "상엽"  # 테스트할 사용자 ID
     }
 
