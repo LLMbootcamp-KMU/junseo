@@ -5,9 +5,9 @@ def test_get_day_food():
     url = "http://localhost:5001/api/food/get_day"
     params = {
         "year": 2024,
-        "month": 7,
+        "month": 3,
         "day": 24,
-        "user_id": "정빈"  # 테스트할 사용자 ID
+        "user_id": "상엽"  # 테스트할 사용자 ID
     }
 
     response = requests.get(url, params=params)

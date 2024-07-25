@@ -229,5 +229,48 @@ def get_advice_route():
 
     return jsonify({"averages": averages, "advice": advice})
 
+@app.route('/api/food/avg_kcal', methods=['GET'])
+def get_avg_kcal():
+    year = request.args.get('year')
+    month = request.args.get('month')
+    user_id = request.args.get('user_id')
+
+    if not year or not month or not user_id:
+        return jsonify({"error": "Year, month, and user_id are required"}), 400
+
+    try:
+        year = int(year)
+        month = int(month)
+        if month < 1 or month > 12:
+            return jsonify({"error": "Invalid month. Please enter a value between 1 and 12."}), 400
+    except ValueError:
+        return jsonify({"error": "Year and month must be integers."}), 400
+
+    # 현재 달의 데이터를 가져옵니다
+    monthly_data = get_monthly_data(year, month, user_id)
+
+    if "error" in monthly_data:
+        logging.error(f"Failed to get monthly data: {monthly_data['error']}")
+        return jsonify(monthly_data), 500
+
+    foods_list = monthly_data['foods']
+
+    # 한 달치 평균 칼로리 계산
+    total_kcal = 0
+    count = 0
+
+    for day_foods in foods_list:
+        for food in day_foods:
+            total_kcal += food.get('calories', 0)
+            count += 1
+
+    if count == 0:
+        logging.error("No valid data to calculate averages")
+        return jsonify({"error": "No valid data to calculate averages"}), 404
+
+    average_kcal = total_kcal / count
+
+    return jsonify({"average_kcal": round(average_kcal, 1)})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)  # 다른 포트로

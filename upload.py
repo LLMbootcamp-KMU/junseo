@@ -1,12 +1,13 @@
-# test_llm.py
-
-import llm
+from flask import Flask, request, jsonify
 import pymysql
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import upload_llm as llm
 
 load_dotenv()
+
+app = Flask(__name__)
 
 # DB Connection
 db_config = {
@@ -26,7 +27,7 @@ def save_to_db(user_id, nutrition_info):
             """
             cursor.execute(sql, (
                 user_id,
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                datetime.now(),  # 현재 날짜와 시간 저장
                 nutrition_info['food_name'],
                 nutrition_info['protein'],
                 nutrition_info['fat'],
@@ -38,12 +39,28 @@ def save_to_db(user_id, nutrition_info):
     finally:
         connection.close()
 
-# Test input
-test_user_id = '정빈'  # 이 부분에 유효한 사용자 ID를 넣으세요.
-test_food = "떡볶이"  # 이 부분에 원하는 테스트 음식을 넣으세요.
+@app.route('/api/upload', methods=['POST'])
+def upload():
+    user_id = request.form.get('user_id')
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
 
-# Get nutrition info
-nutrition_info = llm.do(test_food)
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
 
-save_to_db(test_user_id, nutrition_info)
-print(f"Nutrition information for {test_food} has been saved to the database.")
+    if file:
+        file_path = os.path.join("/tmp", file.filename)
+        file.save(file_path)
+
+        nutrition_info = llm.do(file_path)
+        
+        if 'error' in nutrition_info:
+            return jsonify(nutrition_info), 400
+        
+        save_to_db(user_id, nutrition_info)
+        
+        return jsonify(nutrition_info)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
