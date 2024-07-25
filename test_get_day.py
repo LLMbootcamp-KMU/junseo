@@ -1,11 +1,12 @@
 import requests
 import json
 
-def test_get_quarterly_food():
-    url = "http://localhost:5001/api/food/quarterly"
+def test_get_day_food():
+    url = "http://localhost:5001/api/food/get_day"
     params = {
         "year": 2024,
         "month": 7,
+        "day": 24,
         "user_id": "정빈"  # 테스트할 사용자 ID
     }
 
@@ -18,4 +19,4 @@ def test_get_quarterly_food():
         print("Error:", response.status_code, response.text)
 
 if __name__ == '__main__':
-    test_get_quarterly_food()
+    test_get_day_food()

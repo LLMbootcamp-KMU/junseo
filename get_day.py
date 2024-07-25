@@ -3,7 +3,6 @@ import pymysql
 import os
 from dotenv import load_dotenv
 import logging
-import calendar
 
 load_dotenv()
 
@@ -55,25 +54,22 @@ def get_daily_totals(user_id, date):
     finally:
         connection.close()
 
-def get_monthly_data(year, month, user_id):
+def get_foods_by_date(year, month, day, user_id):
     connection = pymysql.connect(**db_config)
     try:
         with connection.cursor() as cursor:
             sql = """
                 SELECT DATE, FOOD_INDEX, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL
                 FROM FOOD
-                WHERE YEAR(DATE) = %s AND MONTH(DATE) = %s AND ID = %s
+                WHERE YEAR(DATE) = %s AND MONTH(DATE) = %s AND DAY(DATE) = %s AND ID = %s
                 ORDER BY DATE
             """
-            cursor.execute(sql, (year, month, user_id))
+            cursor.execute(sql, (year, month, day, user_id))
             results = cursor.fetchall()
-
-            num_days = calendar.monthrange(year, month)[1]  # 해당 월의 일수 계산
-            foods_list = [[] for _ in range(num_days)]  # 각 날짜별 음식 리스트
-            percentages_list = [{"carbohydrates_percentage": 0, "protein_percentage": 0, "fat_percentage": 0} for _ in range(num_days)]  # 각 날짜별 백분율 리스트
+            foods_list = []  # 특정 날짜의 음식 리스트
+            percentages = {"carbohydrates_percentage": 0, "protein_percentage": 0, "fat_percentage": 0}  # 기본값 0으로 설정
 
             for row in results:
-                day = row[0].day - 1  # 0-based index for lists
                 food_info = {
                     "food_index": row[1],
                     "food_name": row[2],
@@ -82,25 +78,22 @@ def get_monthly_data(year, month, user_id):
                     "carbohydrates": row[5],
                     "calories": row[6]
                 }
-                foods_list[day].append(food_info)
+                foods_list.append(food_info)
 
             # Add daily percentages
-            for day in range(num_days):
-                date_str = f"{year}-{str(month).zfill(2)}-{str(day+1).zfill(2)}"  # 1-based day for dates
-                logging.debug(f"Fetching daily totals for date: {date_str}")
-                daily_totals = get_daily_totals(user_id, date_str)
-                logging.debug(f"Daily totals for {date_str}: {daily_totals}")
-                if daily_totals:
-                    carb_total, protein_total, fat_total, rd_carb, rd_protein, rd_fat = daily_totals
-                    percentages_list[day] = {
-                        "carbohydrates_percentage": round((carb_total / rd_carb) * 100, 1) if rd_carb > 0 else 0,
-                        "protein_percentage": round((protein_total / rd_protein) * 100, 1) if rd_protein > 0 else 0,
-                        "fat_percentage": round((fat_total / rd_fat) * 100, 1) if rd_fat > 0 else 0
-                    }
+            date_str = f"{year}-{str(month).zfill(2)}-{str(day).zfill(2)}"  # 날짜 문자열
+            daily_totals = get_daily_totals(user_id, date_str)
+            if daily_totals:
+                carb_total, protein_total, fat_total, rd_carb, rd_protein, rd_fat = daily_totals
+                percentages = {
+                    "carbohydrates_percentage": round((carb_total / rd_carb) * 100, 1) if rd_carb > 0 else 0,
+                    "protein_percentage": round((protein_total / rd_protein) * 100, 1) if rd_protein > 0 else 0,
+                    "fat_percentage": round((fat_total / rd_fat) * 100, 1) if rd_fat > 0 else 0
+                }
 
             return {
                 "foods": foods_list,
-                "percentages": percentages_list
+                "percentages": percentages
             }
     except pymysql.MySQLError as e:
         logging.error(f"Database error: {e}")
@@ -108,32 +101,32 @@ def get_monthly_data(year, month, user_id):
     finally:
         connection.close()
 
-
-@app.route('/api/food/quarterly', methods=['GET'])
-def get_quarterly_food():
+@app.route('/api/food/get_day', methods=['GET'])
+def get_day_food():
     year = request.args.get('year')
-    start_month = request.args.get('month')
+    month = request.args.get('month')
+    day = request.args.get('day')
     user_id = request.args.get('user_id')
 
-    if not year or not start_month or not user_id:
-        return jsonify({"error": "Year, start month, and user_id are required"}), 400
+    if not year or not month or not day or not user_id:
+        return jsonify({"error": "Year, month, day, and user_id are required"}), 400
 
     try:
         year = int(year)
-        start_month = int(start_month)
-        if start_month < 1 or start_month > 12:
-            return jsonify({"error": "Invalid month. Please enter a value between 1 and 12."}), 400
+        month = int(month)
+        day = int(day)
+        if month < 1 or month > 12 or day < 1 or day > 31:
+            return jsonify({"error": "Invalid month or day. Please enter valid values."}), 400
     except ValueError:
-        return jsonify({"error": "Year and month must be integers."}), 400
+        return jsonify({"error": "Year, month, and day must be integers."}), 400
 
-    quarterly_data = {}
-    for i in range(-1, 2):  # 이전 달, 현재 달, 다음 달 순서로 데이터를 가져오기
-        month = (start_month + i - 1) % 12 + 1
-        current_year = year + (start_month + i - 1) // 12
-        monthly_data = get_monthly_data(current_year, month, user_id)
-        quarterly_data[f"{current_year}-{str(month).zfill(2)}"] = monthly_data
+    daily_data = get_foods_by_date(year, month, day, user_id)
 
-    return jsonify(quarterly_data)
+    if "error" in daily_data:
+        logging.error(f"Failed to get daily data: {daily_data['error']}")
+        return jsonify(daily_data), 500
+
+    return jsonify(daily_data)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)  # 다른 포트로 실행하여 send.py와 충돌 방지
