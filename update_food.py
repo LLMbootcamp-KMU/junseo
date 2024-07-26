@@ -18,7 +18,7 @@ db_config = {
     'database': os.getenv('DB_NAME')
 }
 
-@app.route('/api/food/add', methods=['POST'])
+@app.route('/api/add_food', methods=['POST'])
 def add_food():
     data = request.json
     
